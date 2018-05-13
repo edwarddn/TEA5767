@@ -112,7 +112,7 @@ void protecaoTela() {
     to = 10000;
   }
   
-  if (efeitoProtecao && to > 10000) {
+  if (efeitoProtecao && to > 1000) {
 
     int randNumber = random(1, 5);
     if (randNumber == 1) {
@@ -158,7 +158,6 @@ void pringDisplay(int baterry, float frequencia, bool isStereo, int sinal) {
   
     display.setCursor(0,25);
     if(isStereo) {
-      sinal = 15;
       display.println("Stereo");
     } else {
       display.println("Mono");
