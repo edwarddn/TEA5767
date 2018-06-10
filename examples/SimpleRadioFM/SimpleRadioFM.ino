@@ -14,6 +14,10 @@ int to = 0;
 int too = 0;
 float previousFrequency = 0;
 float frequency = 0;
+float volt = 0;
+float bMin = 2.8;
+float bMax = 4.2;
+
 
 void setup() {
   Wire.begin(0x10);
@@ -24,6 +28,19 @@ void setup() {
 
 void loop() {
 
+  for(int i; i < 30; i++){
+     volt = volt + ((analogRead(A2)*5.0)/1024.0); 
+     delay(1);
+  }
+  volt = volt / 30;
+  float volts = volt;
+  if(volt > bMax) {
+    volts = bMax;
+  } else if(volt < bMin) {
+    volts = bMin;
+  }
+  int baterry = map(volts, bMin, bMax, 0, 100);
+  
   for(int i; i < 30; i++){
      valAnalogRead = valAnalogRead + analogRead(A0); 
      delay(1);
@@ -39,31 +56,30 @@ void loop() {
     radio.set_frequency(frequency);
     delay(1);
     previousFrequency = frequency;
-    lerRadio(buf);
+    lerRadio(buf, baterry);
     too = 0;
     to = 0;
     protecao = true;
     efeitoProtecao = false;
   }
   
-  if (to > 100 && too < 10) {
-    lerRadio(buf);
+  if (to > 100 && too < 16) {
+    lerRadio(buf, baterry);
     too++;
     to = 0;
-  } else if (too >= 10) {
+  } else if (too >= 16) {
     protecaoTela();
   }
   to++;
 }
 
 double freq;
-void lerRadio(unsigned char *buf) {
+void lerRadio(unsigned char *buf, int baterry) {
   if (radio.read_status(buf) == 1) { 
-    int baterry = 100; //porcentagem da bateria
     freq = floor(radio.frequency_available (buf) / 100000 + .5) / 10;
     bool stereo = radio.stereo(buf);
     int signal_level = radio.signal_level(buf);
-    pringDisplay(baterry, freq, stereo, signal_level);
+    pringDisplay(baterry, freq, stereo, signal_level, volt);
   }
 }
 
@@ -129,9 +145,9 @@ void protecaoTela() {
 }
 
 int atual = 0;
-void pringDisplay(int baterry, float frequencia, bool isStereo, int sinal) {
+void pringDisplay(int baterry, float frequencia, bool isStereo, int sinal, float voltagem) {
   
-  int novo = frequencia + isStereo + sinal;
+  int novo = baterry + frequencia + isStereo + sinal + voltagem;
   if (atual != novo) {
     
     atual = novo;
@@ -164,7 +180,8 @@ void pringDisplay(int baterry, float frequencia, bool isStereo, int sinal) {
     }
 
     display.setCursor(91,25);
-    display.println("Edward");
+    //display.println("Edward");
+    display.println(String(voltagem,2) + "v");
 
     //Bateria
     int valor = map(baterry, 0, 100, 1, 20);
