@@ -11,8 +11,6 @@ TEA5767 radio;
 #define TX 11
 SoftwareSerial bluetooth(RX, TX); // RX, TX
 
-bool protecao = false;
-bool efeitoProtecao = false;
 int valAnalogRead = 0;
 int to = 0;
 int too = 0;
@@ -21,13 +19,7 @@ float frequency = 0;
 float freq;
 byte isBandLimitReached = 0;
 
-float volt = 0;
-float bMin = 2.8;
-float bMax = 3.7;
-
-
-void setup() {
-  
+void setup() {  
   Serial.begin(115200);
   bluetooth.begin(9600);
   initScreen();
@@ -35,30 +27,16 @@ void setup() {
 
 void loop() {
 
-  for (int i; i < 30; i++) {
-    volt = volt + ((analogRead(A2) * 5.0) / 1024.0);
-    delay(1);
-  }
-  volt = volt / 30;
-
-  float volts = volt;
-  if (volt > bMax) {
-    volts = bMax;
-  } else if (volt < bMin) {
-    volts = bMin;
-  }
-  int baterry = map((volts * 100), (bMin * 100), (bMax * 100), 0, 100);
-
-  for (int i; i < 30; i++) {
-    valAnalogRead = valAnalogRead + analogRead(A0);
+  for (int i = 0; i <= 30; i++) {
+    valAnalogRead += analogRead(A2);
     delay(1);
   }
 
   valAnalogRead = valAnalogRead / 30;
   int frequencyInt = map(valAnalogRead, 2, 1014, 8800, 10800); //Analog value to frequency from 87.0 MHz to 107.00 MHz
   frequency = frequencyInt / 100.0f;
-
-  if (bluetooth.available()) {  
+  
+  if (bluetooth.available()) {
     char dados = bluetooth.read();
     if ('0' == dados) {
       bluetooth.println("Desligando!");
@@ -73,64 +51,67 @@ void loop() {
       bluetooth.println("Sem Mudo!");
       radio.turnTheSoundBackOn();
     } else if ('4' == dados) {
-       
+
       radio.setSearchDown();
       radio.setSearchMidStopLevel();
-      
+
       bluetooth.println("Pesquisa down em andamento...");
       isBandLimitReached = radio.searchNextMuting();
-      
+
       bluetooth.print("Limite de banda alcancado? ");
       bluetooth.println(isBandLimitReached ? "Sim" : "Nao");
-      lerRadio(baterry);
+      lerRadio();
       too = 0;
       to = 0;
     } else if ('5' == dados) {
 
       radio.setSearchUp();
       radio.setSearchMidStopLevel();
-      
+
       bluetooth.println("Pesquisa up em andamento...");
       isBandLimitReached = radio.searchNextMuting();
-      
+
       bluetooth.print("Limite de banda alcancado? ");
       bluetooth.println(isBandLimitReached ? "Sim" : "Nao");
-      lerRadio(baterry);
+      lerRadio();
       too = 0;
       to = 0;
-    }    
+    }
   }
 
   if (frequency - previousFrequency >= 0.1f || previousFrequency - frequency >= 0.1f) {
 
     radio.selectFrequency(frequency);
     previousFrequency = frequency;
-    lerRadio(baterry);
+    lerRadio();
     too = 0;
     to = 0;
-    protecao = true;
-    efeitoProtecao = false;
   }
 
-  if (to > 100 && too < 6) {
-    lerRadio(baterry);
+  if (to > 100 && too < 2) {
+    lerRadio();
     to = 0;
-  } else if (too >= 16) {
-    protecaoTela();
   }
-  
-  if (to > 100 && too < 16) {
+  if (to > 99 && too < 6) {
     too++;
   }
-  to++;
+  if (to < 600) {
+    to++;
+  }
+//  Serial.print("DEC");
+//  Serial.print("\n");
+//  Serial.print(to);
+//  Serial.print("\n");
+//  Serial.print(too);
+//  Serial.print("\n");
 }
 
-void lerRadio(int baterry) {
+void lerRadio() {
 
-    freq = radio.readFrequencyInMHz();
-    bool stereo = radio.isStereo();
-    int signal_level = radio.getSignalLevel();
-    pringDisplay(baterry, freq, stereo, signal_level, volt);
+  freq = radio.readFrequencyInMHz();
+  bool stereo = radio.isStereo();
+  int signal_level = radio.getSignalLevel();
+  pringDisplay(freq, stereo, signal_level);
 }
 
 void initScreen() {
@@ -153,54 +134,10 @@ void initScreen() {
   delay(2000);
 }
 
-
-void protecaoTela() {
-
-  if (protecao) {
-
-    protecao = false;
-    efeitoProtecao = true;
-
-    display.clearDisplay();
-    display.setCursor(30, 10);
-    display.setTextSize(2);
-
-    String texto = String(freq, 1);
-    if (texto.length() == 4) {
-      display.println(" " + texto);
-    } else {
-      display.println(texto);
-    }
-
-    display.setTextSize(1);
-    display.setCursor(90, 17);
-    display.println(" MHz");
-    display.display();
-    delay(1);
-
-    to = 10000;
-  }
-
-  if (efeitoProtecao && to > 1000) {
-
-    int randNumber = random(1, 5);
-    if (randNumber == 1) {
-      display.startscrollright(0x00, 0x0F);
-    } else if (randNumber == 2) {
-      display.startscrollleft(0x00, 0x0F);
-    } else if (randNumber == 3) {
-      display.startscrolldiagright(0x00, 0x07);
-    } else if (randNumber == 4) {
-      display.startscrolldiagleft(0x00, 0x07);
-    }
-    to = 0;
-  }
-}
-
 int atual = 0;
-void pringDisplay(int baterry, float frequencia, bool isStereo, int sinal, float voltagem) {
+void pringDisplay(float frequencia, bool isStereo, int sinal) {
 
-  int novo = baterry + frequencia + isStereo + sinal + voltagem;
+  int novo = frequencia + isStereo + sinal;
   if (atual != novo) {
 
     atual = novo;
@@ -216,7 +153,7 @@ void pringDisplay(int baterry, float frequencia, bool isStereo, int sinal, float
     display.setTextSize(2);
     String texto = String(frequencia, 1);
     bluetooth.println(texto + " MHz ");
-     
+
     if (texto.length() == 4) {
       display.println(" " + texto);
     } else {
@@ -235,19 +172,14 @@ void pringDisplay(int baterry, float frequencia, bool isStereo, int sinal, float
     }
 
     display.setCursor(91, 25);
-    //display.println("Edward");
-    display.println(String(voltagem, 2) + "v");
+    display.println("Edward");
 
-    //Bateria
-    int valor = map(baterry, 0, 100, 1, 20);
-    display.fillRect(104 + (20 - valor), 2, valor, 4, WHITE); //conteudo
-    display.drawLine(101, 0, 127, 0, WHITE); //topo
-    display.fillRect(100, 0, 2, 3, WHITE);//barra ponta
-    display.drawLine(97, 2, 101, 2, WHITE); //topo ponta
-    display.fillRect(96, 2, 2, 4, WHITE); //ponta
-    display.drawLine(97, 5, 101, 5, WHITE); //fim ponta
-    display.fillRect(100, 5, 2, 3, WHITE);//barra fim ponta
-    display.drawLine(101, 7, 127, 7, WHITE); //baixo
+    //Barra
+    int valor = map(frequencia, 88, 108, 1, 80);
+    display.fillRect(43 + (80 - valor), 2, valor, 4, WHITE); //conteudo
+    display.drawLine(41, 0, 127, 0, WHITE); //topo
+    display.fillRect(40, 0, 2, 8, WHITE); //ponta    
+    display.drawLine(41, 7, 127, 7, WHITE); //baixo
     display.fillRect(126, 0, 2, 8, WHITE); //fundo
 
     //Antena
@@ -285,4 +217,3 @@ void pringDisplay(int baterry, float frequencia, bool isStereo, int sinal, float
   }
 
 }
-
